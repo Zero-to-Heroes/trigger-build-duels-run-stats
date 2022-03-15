@@ -1,4 +1,4 @@
-import { AllCardsService, GameFormat } from '@firestone-hs/reference-data';
+import { AllCardsService, GameFormat, normalizeDuelsHeroCardId } from '@firestone-hs/reference-data';
 import { DeckDefinition, decode, encode } from 'deckstrings';
 import { ServerlessMysql } from 'serverless-mysql';
 import SqlString from 'sqlstring';
@@ -204,29 +204,7 @@ const findTreasuresCardIds = (decksResults: readonly any[], runId: string): read
 };
 
 const getHero = (playerCardId: string, cards: AllCardsService): number => {
-	const playerClass: string = cards.getCard(playerCardId)?.playerClass;
-	switch (playerClass) {
-		case 'DemonHunter':
-		case 'Demonhunter':
-			return 56550;
-		case 'Druid':
-			return 274;
-		case 'Hunter':
-			return 31;
-		case 'Mage':
-			return 637;
-		case 'Paladin':
-			return 671;
-		case 'Priest':
-			return 813;
-		case 'Rogue':
-			return 930;
-		case 'Shaman':
-			return 1066;
-		case 'Warlock':
-			return 893;
-		case 'Warrior':
-		default:
-			return 7;
-	}
+	const normalizedCardId = normalizeDuelsHeroCardId(playerCardId);
+	const normalizedCard = cards.getCard(normalizedCardId);
+	return normalizedCard?.dbfId ?? 7;
 };
