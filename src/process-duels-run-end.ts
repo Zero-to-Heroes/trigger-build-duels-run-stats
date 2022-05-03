@@ -1,4 +1,10 @@
-import { AllCardsService, GameFormat, normalizeDuelsHeroCardId } from '@firestone-hs/reference-data';
+import {
+	AllCardsService,
+	CardClass,
+	duelsHeroConfigs,
+	GameFormat,
+	normalizeDuelsHeroCardId,
+} from '@firestone-hs/reference-data';
 import { DeckDefinition, decode, encode } from 'deckstrings';
 import { ServerlessMysql } from 'serverless-mysql';
 import SqlString from 'sqlstring';
@@ -89,6 +95,7 @@ const handleReview = async (message: ReviewMessage, mysql: ServerlessMysql): Pro
 		return null;
 	}
 
+	const playerClass = findPlayerClass(firstGameInRun.playerClass, firstGameInRun.playerCardId);
 	const allTreasures = findTreasuresCardIds(lootResults, heroPowerNode.runId);
 	const row: InternalDuelsRow = {
 		gameMode: message.gameMode,
@@ -97,7 +104,7 @@ const handleReview = async (message: ReviewMessage, mysql: ServerlessMysql): Pro
 		buildNumber: message.buildNumber,
 		rating: firstGameInRun.playerRank,
 		runId: runId,
-		playerClass: firstGameInRun.playerClass,
+		playerClass: playerClass,
 		hero: message.playerCardId,
 		heroPower: heroPowerNode.pickedTreasure,
 		signatureTreasure: findSignatureTreasureCardId(lootResults, heroPowerNode.runId),
@@ -111,8 +118,9 @@ const handleReview = async (message: ReviewMessage, mysql: ServerlessMysql): Pro
 			.join(','),
 	} as InternalDuelsRow;
 
+	// For some reason the query is sometimes sent twice, which is why we IGNORE
 	const insertQuery = `
-		INSERT INTO duels_stats_by_run 
+		INSERT IGNORE INTO duels_stats_by_run 
 		(
 			gameMode, 
 			runStartDate, 
@@ -153,6 +161,17 @@ const handleReview = async (message: ReviewMessage, mysql: ServerlessMysql): Pro
 	`;
 	console.log('running query', insertQuery);
 	await mysql.query(insertQuery);
+};
+
+const findPlayerClass = (playerClass: string, heroCardId: string): string => {
+	if (!!playerClass?.length) {
+		return playerClass;
+	}
+	if (!!heroCardId?.length) {
+		const heroClasses = duelsHeroConfigs.find(c => c.hero === heroCardId)?.heroClasses;
+		return heroClasses?.length ? CardClass[heroClasses[0]]?.toLowerCase() : '';
+	}
+	return '';
 };
 
 const cleanDecklist = (initialDecklist: string, playerCardId: string, cards: AllCardsService): string => {
